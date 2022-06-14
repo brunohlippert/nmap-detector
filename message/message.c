@@ -39,20 +39,31 @@ void *recvTCP(){
 	while(1){
 		recvfrom(sockfd, raw_buffer, FRAME_LENGTH, 0, NULL, NULL);
 
-		uint8_t dst_mac[6];
-		// Destination and Source MAC addresse
-        	memcpy(dst_mac, raw_buffer + 6, 6 * sizeof(char));
+		// CHECK IP TYPE
+		if(raw_buffer[12] == ETH_P_IPV6 / 256 && raw_buffer[13] == ETH_P_IPV6 % 256){ 
+			printf("ipv6\n\n");
 
-		printf("%02x:%02x",  dst_mac[0] & 0xff, dst_mac[1] & 0xff);
-		struct tcphdr tcphdr;
-		// TCP header
-	        memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
-		printf("RECEIVED SOMETHING\n");
+			/** ETHERNET header **/
+			uint8_t dst_mac[6];
+			memcpy(dst_mac, raw_buffer + 6, 6 * sizeof(uint8_t));
+			printf("MAC Destiny: %02x:%02x:%02x:%02x:%02x:%02x \n",dst_mac[0]&0xff,dst_mac[1]&0xff,dst_mac[2]&0xff,dst_mac[3]&0xff,dst_mac[4]&0xff,dst_mac[5]&0xff);
+			
+			/** TCP header **/
+	       		//struct tcphdr tcphdr 	
+			//memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
 
-		// IP header
-		//memcpy(ether_frame + ETH_HDRLEN, &iphdr, IP6_HDRLEN * sizeof(uint8_t));
-	
-	
+			/** IP Header **/
+			struct ip6_hdr iphdr;
+			memcpy(&iphdr, raw_buffer + ETH_HDRLEN, IP6_HDRLEN * sizeof(struct ip6_hdr));
+			char ip6_src[INET6_ADDRSTRLEN];
+
+			// inet_ntop converts addres ipv6 type into text	
+			if( inet_ntop(AF_INET6, &iphdr.ip6_src, ip6_src, INET6_ADDRSTRLEN) == NULL){
+				perror("inet_ntop");
+				exit(EXIT_FAILURE);
+			}
+			printf("IP Source: %s\n", ip6_src);	
+		}
 	}
 }
 
