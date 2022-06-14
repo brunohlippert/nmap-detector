@@ -9,19 +9,27 @@
 // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (IP header + TCP header)
 #define FRAME_LENGTH  6 + 6 + 2 + IP6_HDRLEN + TCP_HDRLEN
 
+// Define TCP Useful flags
+#define SYN_FLAG 0x02
+#define FIN_FLAG 0x01
+#define ACK_FLAG 0x10
+
 struct message
 {
     char dst_addr[INET6_ADDRSTRLEN]; // 39 eh o tamanho maximo de um IPV6 contando os ":"
+    uint16_t dst_port;
     char *interface;
 };
 
-int sendTcp(struct message msg);
+
+void *recvTCP();
+int sendTcp(struct message msg, uint8_t tcp_flag);
 
 int openRawSocket(char *interface);
 uint8_t *getMacFromInterface(char *interface, int socketDescriptor);
 struct sockaddr_ll getInterfaceDevice(char *interface);
 struct ip6_hdr getIPV6Header(char * src_ip, char * dst_ip);
-struct tcphdr getTCPHeader(struct ip6_hdr iphdr);
+struct tcphdr getTCPHeader(struct ip6_hdr iphdr, uint16_t dst_port, uint8_t tcp_flag);
 uint8_t *getEthernetFrame(char *src_mac, char *dst_mac, struct ip6_hdr iphdr, struct tcphdr tcphdr);
 void sendEthernetFrame(uint8_t *ether_frame, int socketDescriptor, struct sockaddr_ll device);
 
