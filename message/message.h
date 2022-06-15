@@ -26,7 +26,7 @@
 #define SYN_ACK 4
 
 // Controle de timeout para thread que recebe tcp
-#define TIME_OUT_SECONDS 3
+#define TIME_OUT_SECONDS 8
 
 struct message
 {
