@@ -7,7 +7,7 @@
 #define TCP_HDRLEN 20 // TCP header length, excludes options data
 
 // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (IP header + TCP header)
-#define FRAME_LENGTH  6 + 6 + 2 + IP6_HDRLEN + TCP_HDRLEN
+#define FRAME_LENGTH  6 + 6 + 2 + IP6_HDRLEN + TCP_HDRLEN + 1000
 
 // Define TCP Useful flags
 #define SYN_FLAG 0x02
