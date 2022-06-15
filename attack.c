@@ -34,16 +34,16 @@ int main(int argc, char **argv)
     switch (attack_type)
     {
     case TCP_CONNECT:
-        printf("Iniciando ataque TCP CONNECT...\n");
+        tcpConnectAttack(msg);
         break;
     case TCP_HALF_OPENING:
-        printf("Iniciando ataque TCP HALF OPENING...\n");
+        tcpHalfOpeningAttack(msg);
         break;
     case TCP_FIN:
         tcpFinAttack(msg);
         break;
     case SYN_ACK:
-        printf("Iniciando ataque SYN/ACK...\n");
+        tcpSynAckAttack(msg);
         break;
     default:
         perror("Ataque invalido\n");
@@ -52,9 +52,75 @@ int main(int argc, char **argv)
     return 1;
 }
 
+void tcpConnectAttack(struct message msg)
+{
+    printf("Iniciando ataque TCP CONNECT...\n");
+
+    int numPorts = msg.final_port - msg.inital_port;
+    int *ports = malloc(sizeof(int) * numPorts);
+
+    int i = 0;
+    for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
+    {
+        pthread_t th_recv;
+        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
+        sendTcp(msg.dst_addr, portaAtual, SYN_FLAG, msg.interface);
+
+        void *flag;
+        pthread_join(th_recv, &flag);
+
+        if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
+        {
+            ports[i++] = 1; // Aberta
+            sendTcp(msg.dst_addr, portaAtual, ACK_FLAG, msg.interface);
+        }
+        else
+        {
+            ports[i++] = 0; // Fechada
+        }
+    }
+    printResultado(ports, numPorts, msg.inital_port);
+
+    printf("TCP CONNECT finalizado com successo!\n");
+    free(ports);
+}
+
+void tcpHalfOpeningAttack(struct message msg)
+{
+    printf("Iniciando ataque TCP HALF OPENING...\n");
+
+    int numPorts = msg.final_port - msg.inital_port;
+    int *ports = malloc(sizeof(int) * numPorts);
+
+    int i = 0;
+    for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
+    {
+        pthread_t th_recv;
+        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
+        sendTcp(msg.dst_addr, portaAtual, SYN_FLAG, msg.interface);
+
+        void *flag;
+        pthread_join(th_recv, &flag);
+
+        if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
+        {
+            ports[i++] = 1; // Aberta
+            sendTcp(msg.dst_addr, portaAtual, RST_FLAG, msg.interface);
+        }
+        else
+        {
+            ports[i++] = 0; // Fechada
+        }
+    }
+    printResultado(ports, numPorts, msg.inital_port);
+
+    printf("TCP HALF OPENING finalizado com successo!\n");
+    free(ports);
+}
+
 void tcpFinAttack(struct message msg)
 {
-    printf("Iniciando ataque TCP FIN...\n");
+    printf("Iniciando ataque SYN ACK...\n");
 
     int numPorts = msg.final_port - msg.inital_port;
     int *ports = malloc(sizeof(int) * numPorts);
@@ -69,16 +135,50 @@ void tcpFinAttack(struct message msg)
         void *flag;
         pthread_join(th_recv, &flag);
 
-        if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG){
+        if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG)
+        {
             ports[i++] = 0; // Fechada
         }
-        else{
+        else
+        {
             ports[i++] = 1; // Aberta
         }
     }
     printResultado(ports, numPorts, msg.inital_port);
 
     printf("TCP FIN finalizado com successo!\n");
+    free(ports);
+}
+
+void tcpSynAckAttack(struct message msg)
+{
+    printf("Iniciando ataque TCP FIN...\n");
+
+    int numPorts = msg.final_port - msg.inital_port;
+    int *ports = malloc(sizeof(int) * numPorts);
+
+    int i = 0;
+    for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
+    {
+        pthread_t th_recv;
+        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
+        sendTcp(msg.dst_addr, portaAtual, SYN_ACK_FLAG, msg.interface);
+
+        void *flag;
+        pthread_join(th_recv, &flag);
+
+        if ((int)flag == RST_FLAG)
+        {
+            ports[i++] = 1; // ABERTA
+        }
+        else
+        {
+            ports[i++] = 0; // FECHADA
+        }
+    }
+    printResultado(ports, numPorts, msg.inital_port);
+
+    printf("SYN ACK finalizado com successo!\n");
     free(ports);
 }
 
