@@ -17,11 +17,12 @@
 #include <linux/if_packet.h> // struct sockaddr_ll(see man 7 packet)
 #include <net/ethernet.h>
 #include <errno.h> // errno, perror()
+#include <fcntl.h>
 #include "message.h"
+#include <time.h>
 
 void *recvTCP(void *input)
 {
-
 	char *target_ipv6 = (char *)input;
 
 	struct ifreq ifopts;
@@ -31,16 +32,29 @@ void *recvTCP(void *input)
 	if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) == -1)
 		perror("socket");
 
+	// Define o socket como nao bloqueante na chamada recvfrom, assim, podemos definir um timeout
+	// Para os ataques que a porta esta aberta quando nao ha resposta.
+	int flags = fcntl(sockfd, F_GETFL);
+	flags |= O_NONBLOCK;
+	fcntl(sockfd, F_SETFL, flags);
+
 	struct ether_header *eth_hdr = (struct ether_header *)(&raw_buffer);
-	/* TODO: VER QUAL A FORMA DE PEGAR AS INFORMAÇÕES AQUI*/
+
+	clock_t start = clock();
 	while (1)
 	{
-		recvfrom(sockfd, raw_buffer, FRAME_LENGTH, 0, NULL, NULL);
+		clock_t end = clock();
+		float seconds = (float)(end - start) / CLOCKS_PER_SEC;
 
+		if(seconds >= TIME_OUT_SECONDS){
+			pthread_exit(NO_RESPONSE);
+		}
+
+		recvfrom(sockfd, raw_buffer, FRAME_LENGTH, 0, NULL, NULL);
 		// Ethernet do tipo IPV6
 		if (eth_hdr->ether_type == ntohs(0x86dd))
 		{
-			// Pega o header IPV6 pos ethernet e verifica o IP src (resposta da requisicao)
+			// Pega o header IPV6 e verifica o IP src (resposta da requisicao)
 			struct ip6_hdr *iphdr = (struct ip6_hdr *)(&raw_buffer[ETH_HDRLEN]);
 			char ipv6_src[INET6_ADDRSTRLEN];
 			inet_ntop(AF_INET6, &(iphdr->ip6_src), ipv6_src, INET6_ADDRSTRLEN);
@@ -53,27 +67,27 @@ void *recvTCP(void *input)
 				memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
 
 				uint8_t tcp_flag = tcphdr.th_flags;
-				printf("TCP Flag: %d\n", tcp_flag);
 
-				
+				// Retorna o valor da flag
+				pthread_exit(tcp_flag);
 			}
 		}
 	}
 }
 
-int sendTcp(struct message msg, uint8_t tcp_flag)
+int sendTcp(char *dst_ip, int port, uint8_t tcp_flag, char * interface)
 {
 	int i, status, bytes, tcp_flags[8];
 	uint8_t dst_mac[6];
-	char src_ip[INET6_ADDRSTRLEN], dst_ip[INET6_ADDRSTRLEN];
+	char src_ip[INET6_ADDRSTRLEN];
 
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 *ipv6;
 	void *tp;
 
-	int socketDescriptor = openRawSocket(msg.interface);
-	struct sockaddr_ll device = getInterfaceDevice(msg.interface);
-	uint8_t *src_mac = getMacFromInterface(msg.interface, socketDescriptor);
+	int socketDescriptor = openRawSocket(interface);
+	struct sockaddr_ll device = getInterfaceDevice(interface);
+	uint8_t *src_mac = getMacFromInterface(interface, socketDescriptor);
 
 	// TODO Set destination MAC address: you need to fill these out
 	dst_mac[0] = 0x00;
@@ -85,9 +99,9 @@ int sendTcp(struct message msg, uint8_t tcp_flag)
 
 	// TODO Source IPv6 address: you need to fill this out
 	strcpy(src_ip, "fe80::200:ff:feaa:0");
-	struct ip6_hdr iphdr = getIPV6Header(src_ip, msg.dst_addr);
+	struct ip6_hdr iphdr = getIPV6Header(src_ip, dst_ip);
 	// send SYN
-	struct tcphdr tcphdr = getTCPHeader(iphdr, msg.dst_port, tcp_flag); // getTCPHeader(iphdr);
+	struct tcphdr tcphdr = getTCPHeader(iphdr, port, tcp_flag); // getTCPHeader(iphdr);
 	uint8_t *ether_frame = getEthernetFrame(src_mac, dst_mac, iphdr, tcphdr);
 	sendEthernetFrame(ether_frame, socketDescriptor, device);
 
