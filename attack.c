@@ -13,7 +13,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        strcpy(interface, "wlp0s20f3");
+        strcpy(interface, "enp4s0");
     	dst_port = atoi("8000");
     }
 
@@ -30,8 +30,8 @@ int main(int argc, char **argv)
     
     
     char *dst_addr = malloc(sizeof(char*) * INET6_ADDRSTRLEN);
-    dst_addr = "2804:14d:4c89:8dd2:d166:993:f2f:b5bb";
-    struct message msg = {"2804:14d:4c89:8dd2:d166:993:f2f:b5bb", (uint16_t)dst_port, interface};
+    dst_addr = "fe80::a61f:72ff:fef5:90a8"; //"2804:14d:4c89:8dd2:d166:993:f2f:b5bb";
+    struct message msg = {"fe80::a61f:72ff:fef5:90a8", (uint16_t)dst_port, interface};
     printf("ready to fly\n");
     sendTcp(msg, FIN_FLAG);
 
