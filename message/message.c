@@ -37,7 +37,7 @@ void *recvTCP(void *input)
 	{
 		recvfrom(sockfd, raw_buffer, FRAME_LENGTH, 0, NULL, NULL);
 
-		// Ethernet do tipo TCP
+		// Ethernet do tipo IPV6
 		if (eth_hdr->ether_type == ntohs(0x86dd))
 		{
 			// Pega o header IPV6 pos ethernet e verifica o IP src (resposta da requisicao)
@@ -45,35 +45,17 @@ void *recvTCP(void *input)
 			char ipv6_src[INET6_ADDRSTRLEN];
 			inet_ntop(AF_INET6, &(iphdr->ip6_src), ipv6_src, INET6_ADDRSTRLEN);
 
-			// Se recebemos uma resposta do target
-			if (strcmp(ipv6_src, target_ipv6) == 0)
+			// Se recebemos uma resposta do target e se o next header eh um tcp (para nao pegar ICMPv6)
+			if (strcmp(ipv6_src, target_ipv6) == 0 && iphdr->ip6_ctlun.ip6_un1.ip6_un1_nxt == 6)
 			{
 				/** TCP header **/
 				struct tcphdr tcphdr;
 				memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
 
 				uint8_t tcp_flag = tcphdr.th_flags;
-				printf("TCP Flag: %u\n", tcp_flag);
+				printf("TCP Flag: %d\n", tcp_flag);
 
-				/** IP Header **/
-
-				/*
-				struct ip6_hdr iphdr;
-				memcpy(&iphdr, raw_buffer + ETH_HDRLEN, IP6_HDRLEN * sizeof(struct ip6_hdr));
-				char ip6_src[INET6_ADDRSTRLEN];
-				char ip6_dst[INET6_ADDRSTRLEN];
-				uint16_t src_port, dst_port;
-
-				// inet_ntop converts addres ipv6 type into text
-				if( (inet_ntop(AF_INET6, &iphdr.ip6_src, ip6_src, INET6_ADDRSTRLEN) == NULL) &&
-					 inet_ntop(AF_INET6, &iphdr.ip6_ds, ip6_dst, INET6_ADDRSTRLEN) == NULL){
-					perror("inet_ntop");
-					exit(EXIT_FAILURE);
-				}
-				printf("IP Source: %s\n", ip6_src);
-
-				printf("IP Destiny: %s\n", ip6_dst);
-				*/
+				
 			}
 		}
 	}
@@ -94,15 +76,15 @@ int sendTcp(struct message msg, uint8_t tcp_flag)
 	uint8_t *src_mac = getMacFromInterface(msg.interface, socketDescriptor);
 
 	// TODO Set destination MAC address: you need to fill these out
-	dst_mac[0] = 0x52;
-	dst_mac[1] = 0x2d;
-	dst_mac[2] = 0x6b;
-	dst_mac[3] = 0xf8;
-	dst_mac[4] = 0xcf;
-	dst_mac[5] = 0x79;
+	dst_mac[0] = 0x00;
+	dst_mac[1] = 0x00;
+	dst_mac[2] = 0x00;
+	dst_mac[3] = 0xaa;
+	dst_mac[4] = 0x00;
+	dst_mac[5] = 0x01;
 
 	// TODO Source IPv6 address: you need to fill this out
-	strcpy(src_ip, "fe80::6349:44af:6ca6:37fe");
+	strcpy(src_ip, "fe80::200:ff:feaa:0");
 	struct ip6_hdr iphdr = getIPV6Header(src_ip, msg.dst_addr);
 	// send SYN
 	struct tcphdr tcphdr = getTCPHeader(iphdr, msg.dst_port, tcp_flag); // getTCPHeader(iphdr);

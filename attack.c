@@ -14,17 +14,18 @@ int main(int argc, char **argv)
     }
     else
     {
-        strcpy(interface, "enp1s0");
-        dst_port = atoi("10");
+        strcpy(interface, "eth0");
+        dst_port = atoi("11");
     }
 
-    strcpy(dst_address, "2804:d51:4330:7d00:502d:6bff:fef8:cf79");
+    strcpy(dst_address, "fe80::200:ff:feaa:1");
 
     struct message msg = {dst_address, dst_port, interface};
 
     pthread_t th_recv;
     pthread_create(&th_recv, NULL, recvTCP, dst_address);
 
+    sleep(1);
     sendTcp(msg, FIN_FLAG);
 
     pthread_join(th_recv, NULL);
