@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include "message.h"
 #include <time.h>
+#include <ifaddrs.h>
 
 void *recvTCP(void *input)
 {
@@ -46,7 +47,8 @@ void *recvTCP(void *input)
 		clock_t end = clock();
 		float seconds = (float)(end - start) / CLOCKS_PER_SEC;
 
-		if(seconds >= TIME_OUT_SECONDS){
+		if (seconds >= TIME_OUT_SECONDS)
+		{
 			pthread_exit(NO_RESPONSE);
 		}
 
@@ -75,11 +77,10 @@ void *recvTCP(void *input)
 	}
 }
 
-int sendTcp(char *dst_ip, int port, uint8_t tcp_flag, char * interface)
+int sendTcp(char *dst_ip, int port, uint8_t tcp_flag, char *interface)
 {
 	int i, status, bytes, tcp_flags[8];
 	uint8_t dst_mac[6];
-	char src_ip[INET6_ADDRSTRLEN];
 
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 *ipv6;
@@ -98,14 +99,62 @@ int sendTcp(char *dst_ip, int port, uint8_t tcp_flag, char * interface)
 	dst_mac[5] = 0x01;
 
 	// TODO Source IPv6 address: you need to fill this out
-	strcpy(src_ip, "fe80::200:ff:feaa:0");
-	struct ip6_hdr iphdr = getIPV6Header(src_ip, dst_ip);
+	struct ifaddrs *ifa, *ifa_tmp;
+	char addr[INET6_ADDRSTRLEN];
+	char *helpAddr = getIPV6FromInterface(interface);
+
+	struct ip6_hdr iphdr = getIPV6Header(helpAddr, dst_ip);
 	// send SYN
 	struct tcphdr tcphdr = getTCPHeader(iphdr, port, tcp_flag); // getTCPHeader(iphdr);
 	uint8_t *ether_frame = getEthernetFrame(src_mac, dst_mac, iphdr, tcphdr);
 	sendEthernetFrame(ether_frame, socketDescriptor, device);
 
 	return (EXIT_SUCCESS);
+}
+
+char *getIPV6FromInterface(char *interface)
+{
+	struct ifaddrs *ifa, *ifa_tmp;
+	char addr[INET6_ADDRSTRLEN];
+	char *addr2 = malloc(INET6_ADDRSTRLEN * sizeof(char));
+
+	if (getifaddrs(&ifa) == -1)
+	{
+		perror("getifaddrs failed");
+		exit(1);
+	}
+
+	ifa_tmp = ifa;
+	while (ifa_tmp)
+	{
+		if ((ifa_tmp->ifa_addr) && ((ifa_tmp->ifa_addr->sa_family == AF_INET) ||
+									(ifa_tmp->ifa_addr->sa_family == AF_INET6)))
+		{
+			if (ifa_tmp->ifa_addr->sa_family == AF_INET)
+			{
+				// create IPv4 string
+				struct sockaddr_in *in = (struct sockaddr_in *)ifa_tmp->ifa_addr;
+				inet_ntop(AF_INET, &in->sin_addr, addr, sizeof(addr));
+			}
+			else
+			{ // AF_INET6
+				// create IPv6 string
+				struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)ifa_tmp->ifa_addr;
+				inet_ntop(AF_INET6, &in6->sin6_addr, addr, sizeof(addr));
+
+				if (strcmp(interface, ifa_tmp->ifa_name) == 0)
+				{
+					if (strlen(addr) > 16)
+					{
+						memcpy(addr2, addr, INET6_ADDRSTRLEN * sizeof(char));
+						return addr2;
+					}
+				}
+			}
+		}
+		ifa_tmp = ifa_tmp->ifa_next;
+	}
+	freeifaddrs(ifa);
 }
 
 int openRawSocket(char *interface)

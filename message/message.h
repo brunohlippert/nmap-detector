@@ -50,3 +50,4 @@ void sendEthernetFrame(uint8_t *ether_frame, int socketDescriptor, struct sockad
 
 uint16_t checksum(uint16_t *, int);
 uint16_t tcp6_checksum(struct ip6_hdr, struct tcphdr);
+char * getIPV6FromInterface(char * interface);
