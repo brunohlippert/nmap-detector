@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>          // close()
-#include <string.h>          // strcpy, memset(), and memcpy()
-#include <netdb.h>	     // struct addrinfo
-#include <sys/types.h>       // needed for socket(), uint8_t, uint16_t, uint32_t
+#include <unistd.h>			 // close()
+#include <string.h>			 // strcpy, memset(), and memcpy()
+#include <netdb.h>			 // struct addrinfo
+#include <sys/types.h>		 // needed for socket(), uint8_t, uint16_t, uint32_t
 #include <sys/socket.h>		 // needed for socket()
 #include <netinet/in.h>		 // IPPROTO_TCP, INET6_ADDRSTRLEN
 #include <netinet/ip.h>		 // IP_MAXPACKET(which is 65535)
@@ -19,72 +19,65 @@
 #include <errno.h> // errno, perror()
 #include "message.h"
 
-void *recvTCP(){
+void *recvTCP(void *input)
+{
+
+	char *target_ipv6 = (char *)input;
+
 	struct ifreq ifopts;
 	int sockfd;
-	char ifName[IFNAMSIZ];	
+	char ifName[IFNAMSIZ];
 	uint8_t raw_buffer[FRAME_LENGTH];
-	if((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) == -1)
+	if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) == -1)
 		perror("socket");
-	
 
-	strncpy(ifopts.ifr_name, ifName, IFNAMSIZ - 1);
-	ioctl(sockfd, SIOCGIFFLAGS, &ifopts);
-	ifopts.ifr_flags |= IFF_PROMISC;
-	ioctl(sockfd, SIOCSIFFLAGS, &ifopts);
-
-
-	struct ether_header *eth_hdr = (struct ether_header *)(&raw_buffer); 
+	struct ether_header *eth_hdr = (struct ether_header *)(&raw_buffer);
 	/* TODO: VER QUAL A FORMA DE PEGAR AS INFORMAÇÕES AQUI*/
-	while(1){
+	while (1)
+	{
 		recvfrom(sockfd, raw_buffer, FRAME_LENGTH, 0, NULL, NULL);
-		//printf("%x\n", raw_buffer[12]);		
-		// CHECK IP TYPE6 == 0x86dd
-		//if(raw_buffer[12] == ETH_P_IPV6 / 256 && raw_buffer[13] == ETH_P_IPV6 % 256){ 
-		if(eth_hdr->ether_type == ntohs(0x86dd)){
-			printf("ipv6\n\n");
 
-			/** ETHERNET header **/
-			uint8_t dst_mac[6];
-			uint8_t src_mac[6];
-			memcpy(dst_mac, raw_buffer, 6 * sizeof(uint8_t));
-			memcpy(src_mac, raw_buffer + 6, 6 * sizeof(uint8_t));
-			
-			printf("MAC Destiny: %02x:%02x:%02x:%02x:%02x:%02x \n",dst_mac[0]&0xff,dst_mac[1]&0xff,dst_mac[2]&0xff,dst_mac[3]&0xff,dst_mac[4]&0xff,dst_mac[5]&0xff);
-			printf("MAC Source: %02x:%02x:%02x:%02x:%02x:%02x \n",src_mac[0]&0xff,src_mac[1]&0xff,src_mac[2]&0xff,src_mac[3]&0xff,src_mac[4]&0xff,src_mac[5]&0xff);
-			
-			
-			/** TCP header **/
-	       		struct tcphdr tcphdr; 	
-			memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
-			
-			uint8_t tcp_flag = tcphdr.th_flags;
-			printf("TCP Flag: %u\n", tcp_flag);		
-			
-			/** IP Header **/
-			
-			/*
-			struct ip6_hdr iphdr;
-			memcpy(&iphdr, raw_buffer + ETH_HDRLEN, IP6_HDRLEN * sizeof(struct ip6_hdr));
-			char ip6_src[INET6_ADDRSTRLEN];
-			char ip6_dst[INET6_ADDRSTRLEN];	
-			uint16_t src_port, dst_port;			
+		// Ethernet do tipo TCP
+		if (eth_hdr->ether_type == ntohs(0x86dd))
+		{
+			// Pega o header IPV6 pos ethernet e verifica o IP src (resposta da requisicao)
+			struct ip6_hdr *iphdr = (struct ip6_hdr *)(&raw_buffer[ETH_HDRLEN]);
+			char ipv6_src[INET6_ADDRSTRLEN];
+			inet_ntop(AF_INET6, &(iphdr->ip6_src), ipv6_src, INET6_ADDRSTRLEN);
 
-			// inet_ntop converts addres ipv6 type into text	
-			if( (inet_ntop(AF_INET6, &iphdr.ip6_src, ip6_src, INET6_ADDRSTRLEN) == NULL) &&
-			     inet_ntop(AF_INET6, &iphdr.ip6_ds, ip6_dst, INET6_ADDRSTRLEN) == NULL){
-				perror("inet_ntop");
-				exit(EXIT_FAILURE);
+			// Se recebemos uma resposta do target
+			if (strcmp(ipv6_src, target_ipv6) == 0)
+			{
+				/** TCP header **/
+				struct tcphdr tcphdr;
+				memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
+
+				uint8_t tcp_flag = tcphdr.th_flags;
+				printf("TCP Flag: %u\n", tcp_flag);
+
+				/** IP Header **/
+
+				/*
+				struct ip6_hdr iphdr;
+				memcpy(&iphdr, raw_buffer + ETH_HDRLEN, IP6_HDRLEN * sizeof(struct ip6_hdr));
+				char ip6_src[INET6_ADDRSTRLEN];
+				char ip6_dst[INET6_ADDRSTRLEN];
+				uint16_t src_port, dst_port;
+
+				// inet_ntop converts addres ipv6 type into text
+				if( (inet_ntop(AF_INET6, &iphdr.ip6_src, ip6_src, INET6_ADDRSTRLEN) == NULL) &&
+					 inet_ntop(AF_INET6, &iphdr.ip6_ds, ip6_dst, INET6_ADDRSTRLEN) == NULL){
+					perror("inet_ntop");
+					exit(EXIT_FAILURE);
+				}
+				printf("IP Source: %s\n", ip6_src);
+
+				printf("IP Destiny: %s\n", ip6_dst);
+				*/
 			}
-			printf("IP Source: %s\n", ip6_src);
-	
-			printf("IP Destiny: %s\n", ip6_dst);	
-			*/
 		}
 	}
 }
-
-
 
 int sendTcp(struct message msg, uint8_t tcp_flag)
 {
@@ -101,24 +94,23 @@ int sendTcp(struct message msg, uint8_t tcp_flag)
 	uint8_t *src_mac = getMacFromInterface(msg.interface, socketDescriptor);
 
 	// TODO Set destination MAC address: you need to fill these out
-	dst_mac[0] =0xa4;
-	dst_mac[1] =0x1f;
-	dst_mac[2] =0x72;
-	dst_mac[3] =0xf5;
-	dst_mac[4] =0x90;
-	dst_mac[5] =0xa8;
+	dst_mac[0] = 0x52;
+	dst_mac[1] = 0x2d;
+	dst_mac[2] = 0x6b;
+	dst_mac[3] = 0xf8;
+	dst_mac[4] = 0xcf;
+	dst_mac[5] = 0x79;
 
 	// TODO Source IPv6 address: you need to fill this out
-	strcpy(src_ip, "fe80::a61f:72ff:fef5:90be");
+	strcpy(src_ip, "fe80::6349:44af:6ca6:37fe");
 	struct ip6_hdr iphdr = getIPV6Header(src_ip, msg.dst_addr);
-	//send SYN
-	struct tcphdr tcphdr = getTCPHeader(iphdr, msg.dst_port, tcp_flag);             //getTCPHeader(iphdr);
+	// send SYN
+	struct tcphdr tcphdr = getTCPHeader(iphdr, msg.dst_port, tcp_flag); // getTCPHeader(iphdr);
 	uint8_t *ether_frame = getEthernetFrame(src_mac, dst_mac, iphdr, tcphdr);
 	sendEthernetFrame(ether_frame, socketDescriptor, device);
 
 	return (EXIT_SUCCESS);
 }
-
 
 int openRawSocket(char *interface)
 {
@@ -199,12 +191,12 @@ struct tcphdr getTCPHeader(struct ip6_hdr iphdr, uint16_t dst_port, uint8_t tcp_
 	struct tcphdr tcphdr;
 
 	tcphdr.th_sport = htons(60);				  // Source port number (16 bits)
-	tcphdr.th_dport = htons(dst_port);				  // Destination port number (16 bits)
+	tcphdr.th_dport = htons(dst_port);			  // Destination port number (16 bits)
 	tcphdr.th_seq = htonl(0);					  // Sequence number (32 bits)
 	tcphdr.th_ack = htonl(0);					  // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
 	tcphdr.th_x2 = 0;							  // Reserved(4 bits): should be 0
 	tcphdr.th_off = TCP_HDRLEN / 4;				  // Data offset (4 bits): size of TCP header in 32-bit words
-	tcphdr.th_flags = tcp_flag;						  // tcp flags: CWR, ECE, URG, ACK, PSH, RST, SYN, FIN
+	tcphdr.th_flags = tcp_flag;					  // tcp flags: CWR, ECE, URG, ACK, PSH, RST, SYN, FIN
 	tcphdr.th_win = htons(65535);				  // Window size (16 bits)
 	tcphdr.th_urp = htons(0);					  // Urgent pointer (16 bits): 0 (only valid if URG flag is set)
 	tcphdr.th_sum = tcp6_checksum(iphdr, tcphdr); // TCP checksum(16 bits)
@@ -215,8 +207,7 @@ struct tcphdr getTCPHeader(struct ip6_hdr iphdr, uint16_t dst_port, uint8_t tcp_
 uint8_t *getEthernetFrame(char *src_mac, char *dst_mac, struct ip6_hdr iphdr, struct tcphdr tcphdr)
 {
 	uint8_t *ether_frame = malloc(sizeof(uint8_t) * 1518);
-	
-	
+
 	// Destination and Source MAC addresse
 	memcpy(ether_frame, dst_mac, 6 * sizeof(uint8_t));
 	memcpy(ether_frame + 6, src_mac, 6 * sizeof(uint8_t));

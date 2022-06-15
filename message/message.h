@@ -7,7 +7,7 @@
 #define TCP_HDRLEN 20 // TCP header length, excludes options data
 
 // Ethernet frame length = ethernet header (MAC + MAC + ethernet type) + ethernet data (IP header + TCP header)
-#define FRAME_LENGTH  6 + 6 + 2 + IP6_HDRLEN + TCP_HDRLEN + 1000
+#define FRAME_LENGTH  ETH_HDRLEN + IP6_HDRLEN + TCP_HDRLEN + 1000
 
 // Define TCP Useful flags
 #define SYN_FLAG 0x02
@@ -16,7 +16,7 @@
 
 struct message
 {
-    char dst_addr[INET6_ADDRSTRLEN]; // 39 eh o tamanho maximo de um IPV6 contando os ":"
+    char *dst_addr;
     uint16_t dst_port;
     char *interface;
 };

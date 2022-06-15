@@ -4,38 +4,29 @@
 #include "pthread.h"
 int main(int argc, char **argv)
 {
-    char interface[40];
-    int dst_port; 
+    char interface[40], dst_address[INET6_ADDRSTRLEN];
+    uint16_t dst_port;
+
     if (argc > 2)
-    {    
-	strcpy(interface, argv[1]);
-    	dst_port = atoi(argv[2]);
+    {
+        strcpy(interface, argv[1]);
+        dst_port = atoi(argv[2]);
     }
     else
     {
-        strcpy(interface, "enp4s0");
-    	dst_port = atoi("8000");
+        strcpy(interface, "enp1s0");
+        dst_port = atoi("10");
     }
 
-    printf("%d\n", dst_port);
+    strcpy(dst_address, "2804:d51:4330:7d00:502d:6bff:fef8:cf79");
 
-    
-    
+    struct message msg = {dst_address, dst_port, interface};
+
     pthread_t th_recv;
-    pthread_create(&th_recv, NULL, recvTCP, NULL);
-    sleep(1);
-    
-    
-    
-    
-    
-    char *dst_addr = malloc(sizeof(char*) * INET6_ADDRSTRLEN);
-    dst_addr = "fe80::a61f:72ff:fef5:90a8"; //"2804:14d:4c89:8dd2:d166:993:f2f:b5bb";
-    struct message msg = {"fe80::a61f:72ff:fef5:90a8", (uint16_t)dst_port, interface};
-    printf("ready to fly\n");
+    pthread_create(&th_recv, NULL, recvTCP, dst_address);
+
     sendTcp(msg, FIN_FLAG);
 
     pthread_join(th_recv, NULL);
     return 1;
-
 }
