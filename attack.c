@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        perror("Numero invalido de argumentos\n");
+	perror("Numero invalido de argumentos precisa de 4");
     }
 
     if (msg.inital_port > msg.final_port)
@@ -69,8 +69,9 @@ void tcpConnectAttack(struct message msg)
         void *flag;
         pthread_join(th_recv, &flag);
 
-        if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
-        {
+        //if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
+        if(((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & SYN_FLAG == SYN_FLAG))
+	{
             ports[i++] = 1; // Aberta
             sendTcp(msg.dst_addr, portaAtual, ACK_FLAG, msg.interface);
         }
@@ -102,8 +103,9 @@ void tcpHalfOpeningAttack(struct message msg)
         void *flag;
         pthread_join(th_recv, &flag);
 
-        if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
-        {
+        //if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
+        if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & FIN_FLAG == FIN_FLAG) ) 
+	{
             ports[i++] = 1; // Aberta
             sendTcp(msg.dst_addr, portaAtual, RST_FLAG, msg.interface);
         }
@@ -135,8 +137,9 @@ void tcpFinAttack(struct message msg)
         void *flag;
         pthread_join(th_recv, &flag);
 
-        if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG)
-        {
+        //if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG)
+        if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & RST_FLAG == RST_FLAG) )
+	{
             ports[i++] = 0; // Fechada
         }
         else
