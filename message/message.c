@@ -80,8 +80,6 @@ void *recvTCP(void *input)
 int sendTcp(char *dst_ip, uint8_t *dst_mac, int port, uint8_t tcp_flag, char *interface)
 {
 	int i, status, bytes, tcp_flags[8];
-	//uint8_t dst_mac[6];
-
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 *ipv6;
 	void *tp;
@@ -90,21 +88,11 @@ int sendTcp(char *dst_ip, uint8_t *dst_mac, int port, uint8_t tcp_flag, char *in
 	struct sockaddr_ll device = getInterfaceDevice(interface);
 	uint8_t *src_mac = getMacFromInterface(interface, socketDescriptor);
 
-	// TODO Set destination MAC address: you need to fill these out
-	//dst_mac[0] = 0x00;
-	//dst_mac[1] = 0x00;
-	//dst_mac[2] = 0x00;
-	//dst_mac[3] = 0xaa;
-	//dst_mac[4] = 0x00;
-	//dst_mac[5] = 0x01;
-
-	// TODO Source IPv6 address: you need to fill this out
 	struct ifaddrs *ifa, *ifa_tmp;
 	char addr[INET6_ADDRSTRLEN];
 	char *helpAddr = getIPV6FromInterface(interface);
 
 	struct ip6_hdr iphdr = getIPV6Header(helpAddr, dst_ip);
-	// send SYN
 	struct tcphdr tcphdr = getTCPHeader(iphdr, port, tcp_flag); // getTCPHeader(iphdr);
 	uint8_t *ether_frame = getEthernetFrame(src_mac, dst_mac, iphdr, tcphdr);
 	sendEthernetFrame(ether_frame, socketDescriptor, device);

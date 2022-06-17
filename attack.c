@@ -4,10 +4,6 @@
 #include "pthread.h"
 
 void stringToMAC(char *mac_str, uint8_t *mac_addr){
- 	
-	
-	//mac_addr = malloc(sizeof(uint8_t*)*6);
-	
 	int curr_index = 0;
 	int hex_index = 0;
 	char *hex_str = malloc(sizeof(char*) * 2);
@@ -26,7 +22,7 @@ void stringToMAC(char *mac_str, uint8_t *mac_addr){
 			
 	}
 	mac_addr[curr_index] = (uint8_t)strtol(hex_str, NULL, 16);
-	//free(hex_str);
+	free(hex_str);
 
 }
 
@@ -76,7 +72,6 @@ int main(int argc, char **argv)
     default:
         perror("Ataque invalido\n");
     }
-
     return 1;
 }
 
