@@ -3,6 +3,33 @@
 #include "message/message.h"
 #include "pthread.h"
 
+void stringToMAC(char *mac_str, uint8_t *mac_addr){
+ 	
+	
+	//mac_addr = malloc(sizeof(uint8_t*)*6);
+	
+	int curr_index = 0;
+	int hex_index = 0;
+	char *hex_str = malloc(sizeof(char*) * 2);
+	for(int i = 0; i < 17; i++){
+		if (mac_str[i] == ':'){
+			mac_addr[curr_index] = (uint8_t)strtol(hex_str, NULL, 16);
+			curr_index += 1;
+			hex_index = 0;
+			hex_str[0] = '0';
+			hex_str[1] = '1';
+		}
+		else{
+			hex_str[hex_index] = mac_str[i];
+			hex_index++;
+		}
+			
+	}
+	mac_addr[curr_index] = (uint8_t)strtol(hex_str, NULL, 16);
+	//free(hex_str);
+
+}
+
 int main(int argc, char **argv)
 {
     int attack_type;
@@ -10,10 +37,7 @@ int main(int argc, char **argv)
     if (argc > 5)
     {
         strcpy(msg.dst_addr, argv[1]);
-	
-	char *mac_tmp;
-	strcpy(mac_tmp, str_tok(argv[2], ':'));
-        
+	stringToMAC(argv[2], &msg.dst_mac);
 	msg.inital_port = strtol(argv[3], NULL, 10);
         msg.final_port = strtol(argv[4], NULL, 10);
         strcpy(msg.interface, argv[5]);
@@ -68,16 +92,16 @@ void tcpConnectAttack(struct message msg)
     {
         pthread_t th_recv;
         pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
-        sendTcp(msg.dst_addr, portaAtual, SYN_FLAG, msg.interface);
+        sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, SYN_FLAG, msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);
 
-        //if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
-        if(((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & SYN_FLAG == SYN_FLAG))
+        if ((int)flag == SYN_ACK_FLAG)
+        //if(((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & SYN_FLAG == SYN_FLAG))
 	{
             ports[i++] = 1; // Aberta
-            sendTcp(msg.dst_addr, portaAtual, ACK_FLAG, msg.interface);
+            sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, ACK_FLAG, msg.interface);
         }
         else
         {
@@ -102,16 +126,16 @@ void tcpHalfOpeningAttack(struct message msg)
     {
         pthread_t th_recv;
         pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
-        sendTcp(msg.dst_addr, portaAtual, SYN_FLAG, msg.interface);
+        sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, SYN_FLAG, msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);
 
-        //if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
-        if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & SYN_FLAG == SYN_FLAG) ) 
+        if ((int)flag == SYN_ACK_FLAG)
+        //if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & SYN_FLAG == SYN_FLAG) ) 
 	{
             ports[i++] = 1; // Aberta
-            sendTcp(msg.dst_addr, portaAtual, RST_FLAG, msg.interface);
+            sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, RST_FLAG, msg.interface);
         }
         else
         {
@@ -136,13 +160,13 @@ void tcpFinAttack(struct message msg)
     {
         pthread_t th_recv;
         pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
-        sendTcp(msg.dst_addr, portaAtual, FIN_FLAG, msg.interface);
+        sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, FIN_FLAG, msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);
 
-        //if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG)
-        if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & RST_FLAG == RST_FLAG) )
+        if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG)
+        //if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & RST_FLAG == RST_FLAG) )
 	{
             ports[i++] = 0; // Fechada
         }
@@ -169,7 +193,7 @@ void tcpSynAckAttack(struct message msg)
     {
         pthread_t th_recv;
         pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
-        sendTcp(msg.dst_addr, portaAtual, SYN_ACK_FLAG, msg.interface);
+        sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, SYN_ACK_FLAG, msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);

@@ -14,7 +14,11 @@ ping -6 $IP6_ADDR -c 5;
 
 MAC_ADDR=$( ip neigh | grep $IP6_ADDR | grep -o "[a-f0-9][a-f0-9]:[a-f0-9][a-f0-9]:[a-f0-9][a-f0-9]:[a-f0-9][a-f0-9]:[a-f0-9][a-f0-9]:[a-f0-9][a-f0-9]" | head -n1);
 
-echo "address: $MAC_ADDR";
+echo "ip address:  $IP6_ADDR";
+echo "mac address: $MAC_ADDR";
+echo "port init:   $PORT_INIT";
+echo "port end:    $PORT_END";
+echo "interface:   $INTERFACE";
 
 gcc -Wall -c message/message.c -w
 gcc -Wall -c attack.c -w

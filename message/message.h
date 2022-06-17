@@ -31,7 +31,7 @@
 struct message
 {
     char dst_addr[INET6_ADDRSTRLEN];
-    uint8_t mac_addr[5]; 
+    uint8_t dst_mac[5]; 
     int inital_port;
     int final_port;
     char interface[40];
@@ -39,7 +39,7 @@ struct message
 
 
 void *recvTCP();
-int sendTcp(char *dst_ip, int port, uint8_t tcp_flag, char * interface);
+int sendTcp(char *dst_ip, uint8_t *dst_mac, int port, uint8_t tcp_flag, char * interface);
 
 int openRawSocket(char *interface);
 uint8_t *getMacFromInterface(char *interface, int socketDescriptor);
