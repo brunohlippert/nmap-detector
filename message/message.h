@@ -31,6 +31,7 @@
 struct message
 {
     char dst_addr[INET6_ADDRSTRLEN];
+    uint8_t mac_addr[5]; 
     int inital_port;
     int final_port;
     char interface[40];

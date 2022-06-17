@@ -7,12 +7,16 @@ int main(int argc, char **argv)
 {
     int attack_type;
     struct message msg;
-    if (argc > 4)
+    if (argc > 5)
     {
         strcpy(msg.dst_addr, argv[1]);
-        msg.inital_port = strtol(argv[2], NULL, 10);
-        msg.final_port = strtol(argv[3], NULL, 10);
-        strcpy(msg.interface, argv[4]);
+	
+	char *mac_tmp;
+	strcpy(mac_tmp, str_tok(argv[2], ':'));
+        
+	msg.inital_port = strtol(argv[3], NULL, 10);
+        msg.final_port = strtol(argv[4], NULL, 10);
+        strcpy(msg.interface, argv[5]);
     }
     else
     {
@@ -104,7 +108,7 @@ void tcpHalfOpeningAttack(struct message msg)
         pthread_join(th_recv, &flag);
 
         //if ((int)flag == ACK_FLAG || (int)flag == SYN_ACK_FLAG)
-        if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & FIN_FLAG == FIN_FLAG) ) 
+        if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & SYN_FLAG == SYN_FLAG) ) 
 	{
             ports[i++] = 1; // Aberta
             sendTcp(msg.dst_addr, portaAtual, RST_FLAG, msg.interface);
