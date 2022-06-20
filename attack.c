@@ -52,7 +52,7 @@ int main(int argc, char **argv)
     printf("1 - TCP connect\n");
     printf("2 - TCP half-opening\n");
     printf("3 - TCP FIN\n");
-    printf("4 - SYN/ACK\n");
+    printf("4 - TCP FIN/PUSH/URG\n");
     scanf("%d", &attack_type);
 
     switch (attack_type)
@@ -66,8 +66,8 @@ int main(int argc, char **argv)
     case TCP_FIN:
         tcpFinAttack(msg);
         break;
-    case SYN_ACK:
-        tcpSynAckAttack(msg);
+    case TCP_FIN_PUSH_URG:
+        tcpFinPushUrgAttack(msg);
         break;
     default:
         perror("Ataque invalido\n");
@@ -176,9 +176,9 @@ void tcpFinAttack(struct message msg)
     free(ports);
 }
 
-void tcpSynAckAttack(struct message msg)
+void tcpFinPushUrgAttack(struct message msg)
 {
-    printf("Iniciando ataque TCP FIN...\n");
+    printf("Iniciando ataque TCP FIN/PUSH/URG...\n");
 
     int numPorts = msg.final_port - msg.inital_port;
     int *ports = malloc(sizeof(int) * numPorts);
@@ -188,23 +188,23 @@ void tcpSynAckAttack(struct message msg)
     {
         pthread_t th_recv;
         pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
-        sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, SYN_ACK_FLAG, msg.interface);
+	sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, FIN_PUSH_URG_FLAG,msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);
 
-        if ((int)flag == RST_FLAG)
+        if ((int)flag == RST_ACK_FLAG)
         {
-            ports[i++] = 1; // ABERTA
+            ports[i++] = 0; // FECHADA
         }
         else
         {
-            ports[i++] = 0; // FECHADA
+            ports[i++] = 1; // ABERTA
         }
     }
     printResultado(ports, numPorts, msg.inital_port);
 
-    printf("SYN ACK finalizado com successo!\n");
+    printf("FIN/PUSH/URG finalizado com successo!\n");
     free(ports);
 }
 

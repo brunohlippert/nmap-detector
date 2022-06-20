@@ -13,9 +13,12 @@
 #define FIN_FLAG 0x01
 #define SYN_FLAG 0x02
 #define RST_FLAG 0x04
-#define ACK_FLAG 0x10
+#define PUSH_FLAG 0x08
+#define ACK_FLAG 0X10
+#define URG_FLAG 0x20
 #define SYN_ACK_FLAG 0x12
 #define RST_ACK_FLAG 0x14
+#define FIN_PUSH_URG_FLAG 0x29
 
 #define NO_RESPONSE 0x999
 
@@ -23,7 +26,7 @@
 #define TCP_CONNECT 1
 #define TCP_HALF_OPENING 2
 #define TCP_FIN 3
-#define SYN_ACK 4
+#define TCP_FIN_PUSH_URG 4
 
 // Controle de timeout para thread que recebe tcp
 #define TIME_OUT_SECONDS 8
