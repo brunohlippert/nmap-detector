@@ -1,0 +1,220 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <net/if.h>      // struct ifreq
+#include <netinet/ip6.h> // struct ip6_hdr
+#include <netinet/tcp.h> // struct tcphdr
+#include <arpa/inet.h>   // inet_pton() and inet_ntop()
+#include "message/message.h"
+#include "detector.h"
+#include "attack_statemachines.h"
+#include "pthread.h"
+
+int entriesIndex;
+int size;
+Host_entry *entries;
+
+void *enforcer(void *input)
+{
+  while (1)
+  {
+    for (int i = 0; i < entriesIndex; i++)
+    {
+      Host_entry ent = entries[i];
+      int portscount = 0;
+
+      char ipv6src_str[INET6_ADDRSTRLEN + 1];
+      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
+      memcpy(ipv6src_str, ent.ip6, INET6_ADDRSTRLEN);
+
+      for (int j = 0; j < PORTS_RANGE; j++)
+      {
+        if (ent.ports[j] > 0)
+        {
+          // printf("source: %s, port %d\n ", ipv6src_str, j);
+          portscount++;
+        }
+      }
+      
+      if (portscount > 1)
+      {
+        printf("source: %s, portscount %d\n ", ipv6src_str, portscount);
+      }
+
+      // state machine
+      if (ent.tcpconnect_warn > 0)
+        printf("tcpconnect warn count: %d\n", ent.tcpconnect_warn);
+      
+      if (ent.tcphalf_warn > 0)
+        printf("tcphalf warn count: %d\n", ent.tcphalf_warn);
+    }
+    sleep(1);
+  }
+  return 0;
+}
+
+void process_packet(Host_entry *entry, uint8_t flags)
+{
+  printf("flags %u\n", flags);
+
+  if (flags == SYN_FLAG)
+    entry->syn++;
+
+  if (flags == ACK_FLAG)
+    entry->ack++;
+  
+  if (flags == FIN_FLAG)
+    entry->fin++;
+
+  // TO DO FPU
+  //if (flags == )
+
+
+
+  /*
+  int new_tcpconnect_state = tcpconnect_statemachine(entry->tcpconnect_state, flags);
+  if (new_tcpconnect_state > 0)
+    entry->tcpconnect_state = new_tcpconnect_state;
+  if (new_tcpconnect_state == 0)
+    entry->tcpconnect_warn++;
+
+  int new_tcphalfopen_state = tcphalfopen_statemachine(entry->tcphalf_state, flags);
+  if (new_tcphalfopen_state > 0)
+    entry->tcphalf_state = new_tcphalfopen_state;
+  if (new_tcphalfopen_state == 0)
+    entry->tcphalf_warn++;
+  */
+
+  // int new_tcpconnect_state = tcpconnect_statemachine(entry->tcpconnect_state, flags);
+  // if (new_tcpconnect_state > 0)
+  //   entry->tcpconnect_state = new_tcpconnect_state;
+  // if (new_tcpconnect_state == 0)
+  //   entry->tcpconnect_warn++;
+
+  // int new_tcpconnect_state = tcpconnect_statemachine(entry->tcpconnect_state, flags);
+  // if (new_tcpconnect_state > 0)
+  //   entry->tcpconnect_state = new_tcpconnect_state;
+  // if (new_tcpconnect_state == 0)
+  //   entry->tcpconnect_warn++;
+}
+
+void handle_packet(char ipv6_src[46], struct tcphdr *tcphdr)
+{
+  if (entriesIndex > size)
+  {
+    printf("OVERFLOW!\n");
+    return;
+  }
+
+  for (int i = 0; i < entriesIndex; i++)
+  {
+    if (!memcmp(ipv6_src, entries[i].ip6, INET6_ADDRSTRLEN))
+    {
+      entries[i].count++;
+      entries[i].ports[htons(tcphdr->th_dport)]++;
+      uint8_t flags = tcphdr->th_flags;
+      process_packet(&entries[i], flags);
+
+      char ipv6src_str[INET6_ADDRSTRLEN + 1];
+      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
+      memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
+
+      // printf("hit: %s count: %d port: %d\n", ipv6src_str, entries[i].count, tcphdr->source);
+      return;
+    }
+  }
+
+  Host_entry entry;
+  memcpy(entry.ip6, ipv6_src, INET6_ADDRSTRLEN);
+  entry.count = 1;
+  memset(entry.ports, 0, PORTS_RANGE * sizeof(uint16_t));
+  entry.ports[htons(tcphdr->th_dport)]++;
+
+  uint8_t flags = tcphdr->th_flags;
+  process_packet(&entry, flags);
+
+  // State-machines states. All state machines start at zero then progress as they packets are processed
+  entry.syn = 0;
+  entry.ack = 0;
+  entry.fin = 0;
+  entry.fpu = 0;
+
+  // Warn bits. If > 0 it means that the source has tripped the detection state machines. They count the infractions.
+  entry.tcpconnect_half_warn = 0;
+  entry.tcpconnect_warn = 0;
+  entry.tcphalf_warn = 0;
+  entry.fin_warn = 0;
+  entry.fpu_warn = 0;
+
+  entries[entriesIndex] = entry;
+  entriesIndex++;
+}
+
+void *scanner(void *input)
+{
+  char *interface = (char *)(input);
+  printf("interface\t%s\n", interface);
+
+  char ipv6[INET6_ADDRSTRLEN + 1];
+  memcpy(ipv6, getIPV6FromInterface(interface), INET6_ADDRSTRLEN);
+  ipv6[INET6_ADDRSTRLEN] = '\0';
+  printf("IPv6\t\t%s\n", ipv6);
+
+  int sockfd;
+  if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) == -1)
+    perror("socket");
+
+  uint8_t *raw_buffer = malloc(65536);
+
+  while (1)
+  {
+    memset(raw_buffer, 0, 65536);
+
+    ssize_t buflen = recvfrom(sockfd, raw_buffer, 65536, 0, NULL, NULL);
+    if (buflen < 0)
+    {
+      perror("Error on recvfrom, size of buffer < 0. Exiting.");
+      return (void *)-1;
+    }
+
+    struct ether_header *eth_hdr = (struct ether_header *)(raw_buffer);
+    if (eth_hdr->ether_type == ntohs(0x86dd))
+    {
+      // Pega o header IPV6 e verifica o IP src (resposta da requisicao)
+      struct ip6_hdr *iphdr = (struct ip6_hdr *)(raw_buffer + sizeof(struct ether_header));
+
+      char ipv6_src[INET6_ADDRSTRLEN];
+      inet_ntop(AF_INET6, &(iphdr->ip6_src), ipv6_src, INET6_ADDRSTRLEN);
+
+      char ipv6src_str[INET6_ADDRSTRLEN + 1];
+      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
+      memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
+
+      if (iphdr->ip6_ctlun.ip6_un1.ip6_un1_nxt == 6 && memcmp(ipv6, ipv6src_str, INET6_ADDRSTRLEN))
+      {
+        /** TCP header **/
+        struct tcphdr *tcphdr = (struct tcphdr *)(raw_buffer + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
+        handle_packet(ipv6_src, tcphdr);
+      }
+    }
+  }
+}
+
+int main(int argc, char **argv)
+{
+  entriesIndex = 0;
+  size = 10000;
+  entries = malloc(size * sizeof *entries);
+
+  char interface[32];
+  strcpy(interface, argv[1]);
+
+  pthread_t th_scanner;
+  pthread_create(&th_scanner, NULL, scanner, interface);
+
+  pthread_t th_enforcer;
+  pthread_create(&th_enforcer, NULL, enforcer, NULL);
+
+  pthread_join(th_enforcer, NULL);
+  pthread_join(th_scanner, NULL);
+}
