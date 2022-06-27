@@ -20,12 +20,9 @@ void *enforcer(void *input)
   {
     for (int i = 0; i < entriesIndex; i++)
     {
+
       Host_entry ent = entries[i];
       int portscount = 0;
-
-      char ipv6src_str[INET6_ADDRSTRLEN + 1];
-      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
-      memcpy(ipv6src_str, ent.ip6, INET6_ADDRSTRLEN);
 
       for (int j = 0; j < PORTS_RANGE; j++)
       {
@@ -35,18 +32,29 @@ void *enforcer(void *input)
           portscount++;
         }
       }
-      
+
+      char ipv6src_str[INET6_ADDRSTRLEN + 1];
+      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
+      memcpy(ipv6src_str, ent.ip6, INET6_ADDRSTRLEN);
+
+      // port checking
       if (portscount > 1)
       {
-        printf("source: %s, portscount %d\n ", ipv6src_str, portscount);
-      }
+        printf("\n");
+        printf("Potential port detected flooding source: %s, portscount %d\n", ipv6src_str, portscount);
 
-      // state machine
-      if (ent.tcpconnect_warn > 0)
-        printf("tcpconnect warn count: %d\n", ent.tcpconnect_warn);
-      
-      if (ent.tcphalf_warn > 0)
-        printf("tcphalf warn count: %d\n", ent.tcphalf_warn);
+        if (ent.syn && ent.ack)
+          printf("Potential 'TCP Connect' attack detected: %d ACK packets received\n", ent.ack);
+
+        if (ent.syn && !ent.ack)
+          printf("Potential 'TCP half-opening' attack detected: %d SYN packets received\n", ent.syn);
+
+        if (ent.fin)
+          printf("Potential 'FIN' attack detected: %d FIN packets received\n", ent.fin);
+
+        if (ent.fpu)
+          printf("Potential 'FIN PSH URG' attack detected: %d FPU packets received\n", ent.fpu);
+      }
     }
     sleep(1);
   }
@@ -55,54 +63,24 @@ void *enforcer(void *input)
 
 void process_packet(Host_entry *entry, uint8_t flags)
 {
-  printf("flags %u\n", flags);
-
   if (flags == SYN_FLAG)
     entry->syn++;
 
   if (flags == ACK_FLAG)
     entry->ack++;
-  
+
   if (flags == FIN_FLAG)
     entry->fin++;
 
-  // TO DO FPU
-  //if (flags == )
-
-
-
-  /*
-  int new_tcpconnect_state = tcpconnect_statemachine(entry->tcpconnect_state, flags);
-  if (new_tcpconnect_state > 0)
-    entry->tcpconnect_state = new_tcpconnect_state;
-  if (new_tcpconnect_state == 0)
-    entry->tcpconnect_warn++;
-
-  int new_tcphalfopen_state = tcphalfopen_statemachine(entry->tcphalf_state, flags);
-  if (new_tcphalfopen_state > 0)
-    entry->tcphalf_state = new_tcphalfopen_state;
-  if (new_tcphalfopen_state == 0)
-    entry->tcphalf_warn++;
-  */
-
-  // int new_tcpconnect_state = tcpconnect_statemachine(entry->tcpconnect_state, flags);
-  // if (new_tcpconnect_state > 0)
-  //   entry->tcpconnect_state = new_tcpconnect_state;
-  // if (new_tcpconnect_state == 0)
-  //   entry->tcpconnect_warn++;
-
-  // int new_tcpconnect_state = tcpconnect_statemachine(entry->tcpconnect_state, flags);
-  // if (new_tcpconnect_state > 0)
-  //   entry->tcpconnect_state = new_tcpconnect_state;
-  // if (new_tcpconnect_state == 0)
-  //   entry->tcpconnect_warn++;
+  if (flags == FIN_PUSH_URG_FLAG)
+    entry->fpu++;
 }
 
 void handle_packet(char ipv6_src[46], struct tcphdr *tcphdr)
 {
   if (entriesIndex > size)
   {
-    printf("OVERFLOW!\n");
+    printf("HOST OVERFLOW!\n");
     return;
   }
 
@@ -115,9 +93,9 @@ void handle_packet(char ipv6_src[46], struct tcphdr *tcphdr)
       uint8_t flags = tcphdr->th_flags;
       process_packet(&entries[i], flags);
 
-      char ipv6src_str[INET6_ADDRSTRLEN + 1];
-      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
-      memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
+      // char ipv6src_str[INET6_ADDRSTRLEN + 1];
+      // ipv6src_str[INET6_ADDRSTRLEN] = '\0';
+      // memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
 
       // printf("hit: %s count: %d port: %d\n", ipv6src_str, entries[i].count, tcphdr->source);
       return;
@@ -139,12 +117,12 @@ void handle_packet(char ipv6_src[46], struct tcphdr *tcphdr)
   entry.fin = 0;
   entry.fpu = 0;
 
-  // Warn bits. If > 0 it means that the source has tripped the detection state machines. They count the infractions.
-  entry.tcpconnect_half_warn = 0;
-  entry.tcpconnect_warn = 0;
-  entry.tcphalf_warn = 0;
-  entry.fin_warn = 0;
-  entry.fpu_warn = 0;
+  // // Warn bits. If > 0 it means that the source has tripped the detection state machines. They count the infractions.
+  // entry.tcpconnect_half_warn = 0;
+  // entry.tcpconnect_warn = 0;
+  // entry.tcphalf_warn = 0;
+  // entry.fin_warn = 0;
+  // entry.fpu_warn = 0;
 
   entries[entriesIndex] = entry;
   entriesIndex++;
@@ -218,3 +196,4 @@ int main(int argc, char **argv)
   pthread_join(th_enforcer, NULL);
   pthread_join(th_scanner, NULL);
 }
+
