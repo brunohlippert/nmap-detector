@@ -6,4 +6,4 @@ gcc -Wall -c attack_statemachines.c -w
 gcc -o detector message.o detector.o attack_statemachines.o -lpthread
 rm *.o
 
-sudo ./detector enp4s0
+sudo ./detector enp5s0
