@@ -7,7 +7,6 @@
 #include <arpa/inet.h>   // inet_pton() and inet_ntop()
 #include "message/message.h"
 #include "detector.h"
-#include "attack_statemachines.h"
 #include "pthread.h"
 
 #define PORTS_RANGE 65536
