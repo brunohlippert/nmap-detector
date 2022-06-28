@@ -9,6 +9,20 @@
 #include "detector.h"
 #include "pthread.h"
 
+#define PORTS_RANGE 65536
+
+typedef struct
+{
+  char ip6[INET6_ADDRSTRLEN];
+  int count;
+  uint16_t ports[PORTS_RANGE];
+
+  int syn;
+  int ack;
+  int fin;
+  int fpu;
+} Host_entry;
+
 int entriesIndex;
 int size;
 Host_entry *entries;
@@ -39,20 +53,20 @@ void *enforcer(void *input)
       // port checking
       if (portscount > 1)
       {
-        printf("\n");
+        printf("\e[1;1H\e[2J");
         printf("Potential port detected flooding source: %s, portscount %d\n", ipv6src_str, portscount);
 
         if (ent.syn && ent.ack)
-          printf("Potential 'TCP Connect' attack detected: %d ACK packets received\n", ent.ack);
+          printf("\tPotential 'TCP Connect' attack detected: %d ACK packets received\n", ent.ack);
 
         if (ent.syn && !ent.ack)
-          printf("Potential 'TCP half-opening' attack detected: %d SYN packets received\n", ent.syn);
+          printf("\tPotential 'TCP half-opening' attack detected: %d SYN packets received\n", ent.syn);
 
         if (ent.fin)
-          printf("Potential 'FIN' attack detected: %d FIN packets received\n", ent.fin);
+          printf("\tPotential 'FIN' attack detected: %d FIN packets received\n", ent.fin);
 
         if (ent.fpu)
-          printf("Potential 'FIN PSH URG' attack detected: %d FPU packets received\n", ent.fpu);
+          printf("\tPotential 'FIN PSH URG' attack detected: %d FPU packets received\n", ent.fpu);
       }
     }
     sleep(1);
@@ -87,16 +101,18 @@ void handle_packet(char ipv6_src[46], struct tcphdr *tcphdr)
   {
     if (!memcmp(ipv6_src, entries[i].ip6, INET6_ADDRSTRLEN))
     {
+      // char ipv6src_str[INET6_ADDRSTRLEN + 1];
+      // memset(ipv6src_str, '\0', INET6_ADDRSTRLEN + 1);
+      // memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
+      // printf("src:\t%s\n", ipv6_src);
+      // printf("entry:\t%s\n", entries[i].ip6);
+      // printf("memcmp fix:\t%d\n", memcmp(ipv6_src, entries[i].ip6, INET6_ADDRSTRLEN));
+      // printf("memcmp len:\t%d\n", memcmp(ipv6_src, entries[i].ip6, strlen(ipv6_src)));
+
       entries[i].count++;
       entries[i].ports[htons(tcphdr->th_dport)]++;
       uint8_t flags = tcphdr->th_flags;
       process_packet(&entries[i], flags);
-
-      // char ipv6src_str[INET6_ADDRSTRLEN + 1];
-      // ipv6src_str[INET6_ADDRSTRLEN] = '\0';
-      // memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
-
-      // printf("hit: %s count: %d port: %d\n", ipv6src_str, entries[i].count, tcphdr->source);
       return;
     }
   }
@@ -110,18 +126,10 @@ void handle_packet(char ipv6_src[46], struct tcphdr *tcphdr)
   uint8_t flags = tcphdr->th_flags;
   process_packet(&entry, flags);
 
-  // State-machines states. All state machines start at zero then progress as they packets are processed
   entry.syn = 0;
   entry.ack = 0;
   entry.fin = 0;
   entry.fpu = 0;
-
-  // // Warn bits. If > 0 it means that the source has tripped the detection state machines. They count the infractions.
-  // entry.tcpconnect_half_warn = 0;
-  // entry.tcpconnect_warn = 0;
-  // entry.tcphalf_warn = 0;
-  // entry.fin_warn = 0;
-  // entry.fpu_warn = 0;
 
   entries[entriesIndex] = entry;
   entriesIndex++;
@@ -133,8 +141,8 @@ void *scanner(void *input)
   printf("interface\t%s\n", interface);
 
   char ipv6[INET6_ADDRSTRLEN + 1];
+  memset(ipv6, '\0', INET6_ADDRSTRLEN + 1);
   memcpy(ipv6, getIPV6FromInterface(interface), INET6_ADDRSTRLEN);
-  ipv6[INET6_ADDRSTRLEN] = '\0';
   printf("IPv6\t\t%s\n", ipv6);
 
   int sockfd;
@@ -161,13 +169,14 @@ void *scanner(void *input)
       struct ip6_hdr *iphdr = (struct ip6_hdr *)(raw_buffer + sizeof(struct ether_header));
 
       char ipv6_src[INET6_ADDRSTRLEN];
+      memset(ipv6_src, '\0', INET6_ADDRSTRLEN);
       inet_ntop(AF_INET6, &(iphdr->ip6_src), ipv6_src, INET6_ADDRSTRLEN);
 
       char ipv6src_str[INET6_ADDRSTRLEN + 1];
-      ipv6src_str[INET6_ADDRSTRLEN] = '\0';
+      memset(ipv6src_str, '\0', INET6_ADDRSTRLEN + 1);
       memcpy(ipv6src_str, ipv6_src, INET6_ADDRSTRLEN);
 
-      if (iphdr->ip6_ctlun.ip6_un1.ip6_un1_nxt == 6 && memcmp(ipv6, ipv6src_str, INET6_ADDRSTRLEN))
+      if (iphdr->ip6_ctlun.ip6_un1.ip6_un1_nxt == 6 && memcmp(ipv6, ipv6src_str, strlen(ipv6)))
       {
         /** TCP header **/
         struct tcphdr *tcphdr = (struct tcphdr *)(raw_buffer + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
@@ -195,4 +204,3 @@ int main(int argc, char **argv)
   pthread_join(th_enforcer, NULL);
   pthread_join(th_scanner, NULL);
 }
-
