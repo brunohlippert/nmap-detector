@@ -22,14 +22,16 @@
 
 #define NO_RESPONSE 0x999
 
-// Tipos de ataques
-#define TCP_CONNECT 1
-#define TCP_HALF_OPENING 2
-#define TCP_FIN 3
-#define TCP_FIN_PUSH_URG 4
-
 // Controle de timeout para thread que recebe tcp
 #define TIME_OUT_SECONDS 8
+
+
+struct recv_msg{
+
+    char ds_addr[INET6_ADDRSTRLEN];
+    uint16_t s_port;
+
+};
 
 struct message
 {

@@ -24,7 +24,12 @@
 
 void *recvTCP(void *input)
 {
-	char *target_ipv6 = (char *)input;
+
+	struct recv_msg *msg = (struct recv_msg*) input;
+	//char *target_ipv6 = &msg->ds_addr;
+	char target_ipv6[INET6_ADDRSTRLEN];
+   	strcpy(target_ipv6, msg->ds_addr);
+	uint16_t tcp_port = msg->s_port;
 
 	struct ifreq ifopts;
 	int sockfd;
@@ -67,11 +72,12 @@ void *recvTCP(void *input)
 				/** TCP header **/
 				struct tcphdr tcphdr;
 				memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
-
-				uint8_t tcp_flag = tcphdr.th_flags;
-
-				// Retorna o valor da flag
-				pthread_exit(tcp_flag);
+				//vertifica se a porta de origem é a mesma porta destino (* aqui deveria ser conferido o ack também mas...)
+				if(tcp_port == ntohs(tcphdr.th_sport) && ntohl(tcphdr.th_ack) == 667){
+					uint8_t tcp_flag = tcphdr.th_flags;
+					// Retorna o valor da flag
+					pthread_exit(tcp_flag);
+				}
 			}
 		}
 	}
@@ -225,7 +231,7 @@ struct tcphdr getTCPHeader(struct ip6_hdr iphdr, uint16_t dst_port, uint8_t tcp_
 
 	tcphdr.th_sport = htons(60);				  // Source port number (16 bits)
 	tcphdr.th_dport = htons(dst_port);			  // Destination port number (16 bits)
-	tcphdr.th_seq = htonl(0);					  // Sequence number (32 bits)
+	tcphdr.th_seq = htonl(666);					  // Sequence number (32 bits)
 	tcphdr.th_ack = htonl(0);					  // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
 	tcphdr.th_x2 = 0;							  // Reserved(4 bits): should be 0
 	tcphdr.th_off = TCP_HDRLEN / 4;				  // Data offset (4 bits): size of TCP header in 32-bit words

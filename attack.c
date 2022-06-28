@@ -3,6 +3,14 @@
 #include "message/message.h"
 #include "pthread.h"
 
+
+// Tipos de ataques
+#define TCP_CONNECT 1
+#define TCP_HALF_OPENING 2
+#define TCP_FIN 3
+#define TCP_FIN_PUSH_URG 4
+
+
 void stringToMAC(char *mac_str, uint8_t *mac_addr){
 	int curr_index = 0;
 	int hex_index = 0;
@@ -33,8 +41,8 @@ int main(int argc, char **argv)
     if (argc > 5)
     {
         strcpy(msg.dst_addr, argv[1]);
-	stringToMAC(argv[2], &msg.dst_mac);
-	msg.inital_port = strtol(argv[3], NULL, 10);
+	    stringToMAC(argv[2], &msg.dst_mac);
+	    msg.inital_port = strtol(argv[3], NULL, 10);
         msg.final_port = strtol(argv[4], NULL, 10);
         strcpy(msg.interface, argv[5]);
     }
@@ -75,18 +83,23 @@ int main(int argc, char **argv)
     return 1;
 }
 
+
 void tcpConnectAttack(struct message msg)
 {
     printf("Iniciando ataque TCP CONNECT...\n");
 
     int numPorts = msg.final_port - msg.inital_port;
     int *ports = malloc(sizeof(int) * numPorts);
+    struct recv_msg recvMsg;
 
     int i = 0;
     for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
     {
         pthread_t th_recv;
-        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
+        strcpy(recvMsg.ds_addr, msg.dst_addr);
+        recvMsg.s_port = portaAtual;
+        pthread_create(&th_recv, NULL, recvTCP, (void*)&recvMsg);
+        
         sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, SYN_FLAG, msg.interface);
 
         void *flag;
@@ -115,12 +128,16 @@ void tcpHalfOpeningAttack(struct message msg)
 
     int numPorts = msg.final_port - msg.inital_port;
     int *ports = malloc(sizeof(int) * numPorts);
+    struct recv_msg recvMsg;
 
     int i = 0;
     for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
     {
         pthread_t th_recv;
-        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
+        strcpy(recvMsg.ds_addr, msg.dst_addr);
+        recvMsg.s_port = portaAtual;
+        pthread_create(&th_recv, NULL, recvTCP, (void*)&recvMsg);
+        
         sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, SYN_FLAG, msg.interface);
 
         void *flag;
@@ -143,26 +160,31 @@ void tcpHalfOpeningAttack(struct message msg)
     free(ports);
 }
 
+
 void tcpFinAttack(struct message msg)
 {
-    printf("Iniciando ataque SYN ACK...\n");
+    printf("Iniciando ataque FIN ACK...\n");
 
     int numPorts = msg.final_port - msg.inital_port;
     int *ports = malloc(sizeof(int) * numPorts);
+    
+    struct recv_msg recvMsg;
 
     int i = 0;
     for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
     {
         pthread_t th_recv;
-        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
+        strcpy(recvMsg.ds_addr, msg.dst_addr);
+        recvMsg.s_port = portaAtual;
+        pthread_create(&th_recv, NULL, recvTCP, (void*)&recvMsg);
+        
         sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, FIN_FLAG, msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);
 
-        if ((int)flag == RST_ACK_FLAG || (int)flag == RST_FLAG)
-        //if( ((uint8_t)flag & ACK_FLAG == ACK_FLAG) && ((uint8_t)flag & RST_FLAG == RST_FLAG) )
-	{
+        if ((int)flag == RST_ACK_FLAG)
+        {
             ports[i++] = 0; // Fechada
         }
         else
@@ -176,19 +198,24 @@ void tcpFinAttack(struct message msg)
     free(ports);
 }
 
+
 void tcpFinPushUrgAttack(struct message msg)
 {
     printf("Iniciando ataque TCP FIN/PUSH/URG...\n");
 
     int numPorts = msg.final_port - msg.inital_port;
     int *ports = malloc(sizeof(int) * numPorts);
+    struct recv_msg recvMsg;
 
     int i = 0;
     for (int portaAtual = msg.inital_port; portaAtual < msg.final_port + 1; portaAtual++)
     {
         pthread_t th_recv;
-        pthread_create(&th_recv, NULL, recvTCP, msg.dst_addr);
-	sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, FIN_PUSH_URG_FLAG,msg.interface);
+        strcpy(recvMsg.ds_addr, msg.dst_addr);
+        recvMsg.s_port = portaAtual;
+        pthread_create(&th_recv, NULL, recvTCP, (void*)&recvMsg);
+        
+        sendTcp(msg.dst_addr, msg.dst_mac, portaAtual, FIN_PUSH_URG_FLAG,msg.interface);
 
         void *flag;
         pthread_join(th_recv, &flag);
@@ -207,6 +234,7 @@ void tcpFinPushUrgAttack(struct message msg)
     printf("FIN/PUSH/URG finalizado com successo!\n");
     free(ports);
 }
+
 
 void printResultado(int *ports, int numPorts, int portaInicial)
 {
