@@ -1,18 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>			 // close()
-#include <string.h>			 // strcpy, memset(), and memcpy()
-#include <netdb.h>			 // struct addrinfo
-#include <sys/types.h>		 // needed for socket(), uint8_t, uint16_t, uint32_t
-#include <sys/socket.h>		 // needed for socket()
-#include <netinet/in.h>		 // IPPROTO_TCP, INET6_ADDRSTRLEN
-#include <netinet/ip.h>		 // IP_MAXPACKET(which is 65535)
-#include <netinet/ip6.h>	 // struct ip6_hdr
-#include <netinet/tcp.h>	 // struct tcphdr
-#include <arpa/inet.h>		 // inet_pton() and inet_ntop()
-#include <sys/ioctl.h>		 // macro ioctl is defined
-#include <bits/ioctls.h>	 // defines values for argument "request" of ioctl.
-#include <net/if.h>			 // struct ifreq
+#include <unistd.h>					 // close()
+#include <string.h>					 // strcpy, memset(), and memcpy()
+#include <netdb.h>					 // struct addrinfo
+#include <sys/types.h>			 // needed for socket(), uint8_t, uint16_t, uint32_t
+#include <sys/socket.h>			 // needed for socket()
+#include <netinet/in.h>			 // IPPROTO_TCP, INET6_ADDRSTRLEN
+#include <netinet/ip.h>			 // IP_MAXPACKET(which is 65535)
+#include <netinet/ip6.h>		 // struct ip6_hdr
+#include <netinet/tcp.h>		 // struct tcphdr
+#include <arpa/inet.h>			 // inet_pton() and inet_ntop()
+#include <sys/ioctl.h>			 // macro ioctl is defined
+#include <bits/ioctls.h>		 // defines values for argument "request" of ioctl.
+#include <net/if.h>					 // struct ifreq
 #include <linux/if_ether.h>	 // ETH_P_IP = 0x0800, ETH_P_IPV6 = 0x86DD
 #include <linux/if_packet.h> // struct sockaddr_ll(see man 7 packet)
 #include <net/ethernet.h>
@@ -25,10 +25,10 @@
 void *recvTCP(void *input)
 {
 
-	struct recv_msg *msg = (struct recv_msg*) input;
-	//char *target_ipv6 = &msg->ds_addr;
+	struct recv_msg *msg = (struct recv_msg *)input;
+	// char *target_ipv6 = &msg->ds_addr;
 	char target_ipv6[INET6_ADDRSTRLEN];
-   	strcpy(target_ipv6, msg->ds_addr);
+	strcpy(target_ipv6, msg->ds_addr);
 	uint16_t tcp_port = msg->s_port;
 
 	struct ifreq ifopts;
@@ -57,6 +57,7 @@ void *recvTCP(void *input)
 			pthread_exit(NO_RESPONSE);
 		}
 
+		sem_post(&mutex);
 		recvfrom(sockfd, raw_buffer, FRAME_LENGTH, 0, NULL, NULL);
 		// Ethernet do tipo IPV6
 		if (eth_hdr->ether_type == ntohs(0x86dd))
@@ -72,8 +73,9 @@ void *recvTCP(void *input)
 				/** TCP header **/
 				struct tcphdr tcphdr;
 				memcpy(&tcphdr, raw_buffer + ETH_HDRLEN + IP6_HDRLEN, TCP_HDRLEN * sizeof(tcphdr));
-				//vertifica se a porta de origem é a mesma porta destino (* aqui deveria ser conferido o ack também mas...)
-				if(tcp_port == ntohs(tcphdr.th_sport) && ntohl(tcphdr.th_ack) == 667){
+				// vertifica se a porta de origem é a mesma porta destino (* aqui deveria ser conferido o ack também mas...)
+				if (tcp_port == ntohs(tcphdr.th_sport) && ntohl(tcphdr.th_ack) == 667)
+				{
 					uint8_t tcp_flag = tcphdr.th_flags;
 					// Retorna o valor da flag
 					pthread_exit(tcp_flag);
@@ -122,7 +124,7 @@ char *getIPV6FromInterface(char *interface)
 	while (ifa_tmp)
 	{
 		if ((ifa_tmp->ifa_addr) && ((ifa_tmp->ifa_addr->sa_family == AF_INET) ||
-									(ifa_tmp->ifa_addr->sa_family == AF_INET6)))
+																(ifa_tmp->ifa_addr->sa_family == AF_INET6)))
 		{
 			if (ifa_tmp->ifa_addr->sa_family == AF_INET)
 			{
@@ -204,9 +206,9 @@ struct ip6_hdr getIPV6Header(char *src_ip, char *dst_ip)
 	struct ip6_hdr iphdr;
 
 	iphdr.ip6_flow = htonl((6 << 28) | (0 << 20) | 0); // IPv6 version (4 bits), Traffic class (8 bits), Flow label (20 bits)
-	iphdr.ip6_plen = htons(TCP_HDRLEN);				   // Payload length (16 bits): TCP header
-	iphdr.ip6_nxt = IPPROTO_TCP;					   // Next header (8 bits): 6 for TCP
-	iphdr.ip6_hops = 255;							   // Hop limit (8 bits): default to maximum value
+	iphdr.ip6_plen = htons(TCP_HDRLEN);								 // Payload length (16 bits): TCP header
+	iphdr.ip6_nxt = IPPROTO_TCP;											 // Next header (8 bits): 6 for TCP
+	iphdr.ip6_hops = 255;															 // Hop limit (8 bits): default to maximum value
 
 	// Source IPv6 address (128 bits)
 	if ((status = inet_pton(AF_INET6, src_ip, &(iphdr.ip6_src))) != 1)
@@ -229,15 +231,15 @@ struct tcphdr getTCPHeader(struct ip6_hdr iphdr, uint16_t dst_port, uint8_t tcp_
 {
 	struct tcphdr tcphdr;
 
-	tcphdr.th_sport = htons(60);				  // Source port number (16 bits)
-	tcphdr.th_dport = htons(dst_port);			  // Destination port number (16 bits)
-	tcphdr.th_seq = htonl(666);					  // Sequence number (32 bits)
-	tcphdr.th_ack = htonl(0);					  // Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
-	tcphdr.th_x2 = 0;							  // Reserved(4 bits): should be 0
-	tcphdr.th_off = TCP_HDRLEN / 4;				  // Data offset (4 bits): size of TCP header in 32-bit words
-	tcphdr.th_flags = tcp_flag;					  // tcp flags: CWR, ECE, URG, ACK, PSH, RST, SYN, FIN
-	tcphdr.th_win = htons(65535);				  // Window size (16 bits)
-	tcphdr.th_urp = htons(0);					  // Urgent pointer (16 bits): 0 (only valid if URG flag is set)
+	tcphdr.th_sport = htons(60);									// Source port number (16 bits)
+	tcphdr.th_dport = htons(dst_port);						// Destination port number (16 bits)
+	tcphdr.th_seq = htonl(666);										// Sequence number (32 bits)
+	tcphdr.th_ack = htonl(0);											// Acknowledgement number (32 bits): 0 in first packet of SYN/ACK process
+	tcphdr.th_x2 = 0;															// Reserved(4 bits): should be 0
+	tcphdr.th_off = TCP_HDRLEN / 4;								// Data offset (4 bits): size of TCP header in 32-bit words
+	tcphdr.th_flags = tcp_flag;										// tcp flags: CWR, ECE, URG, ACK, PSH, RST, SYN, FIN
+	tcphdr.th_win = htons(65535);									// Window size (16 bits)
+	tcphdr.th_urp = htons(0);											// Urgent pointer (16 bits): 0 (only valid if URG flag is set)
 	tcphdr.th_sum = tcp6_checksum(iphdr, tcphdr); // TCP checksum(16 bits)
 
 	return tcphdr;

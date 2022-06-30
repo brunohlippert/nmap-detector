@@ -30,6 +30,7 @@ void *enforcer(void *input)
 {
   while (1)
   {
+    printf("==============================================================================\n");
     printf("\e[1;1H\e[2J");
 
     for (int i = 0; i < entriesIndex; i++)
