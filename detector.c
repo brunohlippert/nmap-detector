@@ -6,7 +6,6 @@
 #include <netinet/tcp.h> // struct tcphdr
 #include <arpa/inet.h>   // inet_pton() and inet_ntop()
 #include "message/message.h"
-#include "detector.h"
 #include "pthread.h"
 
 #define PORTS_RANGE 65536
@@ -31,9 +30,10 @@ void *enforcer(void *input)
 {
   while (1)
   {
+    printf("\e[1;1H\e[2J");
+
     for (int i = 0; i < entriesIndex; i++)
     {
-
       Host_entry ent = entries[i];
       int portscount = 0;
 
@@ -53,8 +53,7 @@ void *enforcer(void *input)
       // port checking
       if (portscount > 1)
       {
-        printf("\e[1;1H\e[2J");
-        printf("Potential port detected flooding source: %s, portscount %d\n", ipv6src_str, portscount);
+        printf("Potential port scanning detected:\n\tSource: %s\n\tPort count: %d\n", ipv6src_str, portscount);
 
         if (ent.syn && ent.ack)
           printf("\tPotential 'TCP Connect' attack detected: %d ACK packets received\n", ent.ack);
@@ -67,6 +66,8 @@ void *enforcer(void *input)
 
         if (ent.fpu)
           printf("\tPotential 'FIN PSH URG' attack detected: %d FPU packets received\n", ent.fpu);
+
+        printf("\n");
       }
     }
     sleep(1);
